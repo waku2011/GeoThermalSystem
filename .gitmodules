@@ -1,0 +1,6 @@
+[submodule "CoolProp"]
+	path = CoolProp
+	url = https://github.com/CoolProp/CoolProp.git
+[submodule "PyEVTK"]
+	path = PyEVTK
+	url = https://github.com/paulo-herrera/PyEVTK.git
