@@ -25,7 +25,6 @@ Pin   = 101.3e3  # Pa
 Win   = 10.0     # kg/s
 Rhoin = 1000.0   # kg/m3
 
-
 # W-tube pipe params. 
 # inner 100mm(Downward), outer circular150mm(Upward), thickness both 5mm 
 Ri1 = 45.0e-3
@@ -45,11 +44,11 @@ dU   = 2 *(Ri2 - Ro1)
 cg   = 9.81 # m/s2
 
 # thickness of geo-layers, m
-Lg1 = 200.0 
-Lg2 =  50.0
+Lg1 = 350.0 
+Lg2 =1150.0
 
 # depth from surface
-Z1  = 0.0
+Z1  = 0.0      
 Z2  = Lg1
 Z3  = Lg1+Lg2
 
@@ -57,11 +56,11 @@ RiBC = 0.1  # soil inner boundary radius, m
 RoBC = 50.0 # soil outer boundary radius, m
  
 # number of cells for each direction
-NR =  4     #16 # radius
+NR =  4   #16 # radius
 NT =  8   #32 # tangential 
-NZ = 12   # depth
-NZ1 = 6
-NZ2 = 6  # NZ1+NZ2=NZ
+NZ = 30   # depth
+NZ1 = 7
+NZ2 =23   # NZ1+NZ2=NZ
 
 nNode = (NR+1)*NT*(NZ+1)  # num. of node
 nCell = NR*NT*NZ  # num. of cell
@@ -167,9 +166,9 @@ for i in range(NZ):
 Tg = np.zeros(NZ)
 for i in range(NZ):
    if Z[i] < Z2:
-     Tg[i] = 300.0 #Tg1(Ztube[i])
+     Tg[i] = 273.2 + 30.0+(100.0/350.0)*Z[i]  
    else: 
-     Tg[i] = 300.0 #Tg2(Ztube[i])
+     Tg[i] = 273.2 + 120.0 
 
 Qtube[:] = 1.0
 
@@ -186,15 +185,20 @@ for i in range(2*NZ):
    cptube[i] = PropsSI('C','T',Ttube[i],'P',Ptube[i],'Water')
 
 #-----------------  Ground temperature as reference (real data will be required)
+
 def Tg1(z):
-   Tsg1 = 30.0+273
-   dtdz = 100.0/1000 # 100K/km
+   Tsg1 = 20.0+273.2
+   dtdz = 100.0/350.0    # 100K/350m
    return Tsg1+dtdz*z
      
 def Tg2(z):
-   Tsg2 = 120.0+273  
-   dtdz = 100.0/1000
+   Tsg2 = 120.0+273.2  
+   dtdz = 0.0/1000
    return Tsg2+dtdz*(z-Lg1)
+
+
+def Pg(z):   # static water pressure 
+   return Pin + Rhoin * cg * z
 
 # surface heat transfer coeffs. of w-tube
 def htc_DB(re, pr, tk, d):
@@ -574,7 +578,7 @@ def exportMesh():   # export VTU (unstructured VTK) mesh via EVTK
   field_data = {"test_fd": np.array([1.0, 2.0])}
 
   unstructuredGridToVTK(
-  			"unstructured mesh",
+  			"unstructured_mesh",
   			x, y, z, 
             connectivity = conn,
             offsets = offset, 
