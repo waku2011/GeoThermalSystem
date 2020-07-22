@@ -4,8 +4,8 @@
 #  All unit are in SI
 # 
 
-from evtk.hl import unstructuredGridToVTK
-from evtk.vtk import VtkTetra, VtkHexahedron, VtkWedge, VtkPyramid
+from pyevtk.hl import unstructuredGridToVTK
+from pyevtk.vtk import VtkTetra, VtkHexahedron, VtkWedge, VtkPyramid
 
 #from CoolProp.HumidAirProp import HAPropsSI
 from CoolProp.CoolProp import PropsSI
@@ -569,19 +569,20 @@ def exportMesh():   # export VTU (unstructured VTK) mesh via EVTK
   ctype[:] = VtkHexahedron.tid
   
   # some works
-  
   bftypeMax = np.zeros(nCell)
   bftypeMax[:] = np.max(bftype, axis=1)
+  field_data = {"test_fd": np.array([1.0, 2.0])}
 
-  # coments  
-  comments = [ b"comment 1", b"comment 2" ]
-  unstructuredGridToVTK("mesh", x, y, z, 
+  unstructuredGridToVTK(
+  			"unstructured mesh",
+  			x, y, z, 
             connectivity = conn,
             offsets = offset, 
             cell_types = ctype,
             cellData = {"temp": t[:], "bftypeMax": bftypeMax[:]},   
             pointData = None, 
-            comments = comments)
+            #fieldData = field_data,
+            )
 
 #------------------------------------------------------------------------------
 
@@ -736,7 +737,8 @@ def updateHeatFlux():    # double tube system
    
 def main():
 
-  os.remove("output.csv")
+  if os.path.exists("output.csv"): 
+    os.remove("output.csv")
   with open("output.csv", mode='a') as f:
     writer=csv.writer(f,delimiter=" ")
         
