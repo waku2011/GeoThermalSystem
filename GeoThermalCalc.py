@@ -21,9 +21,9 @@ import os
 
 # Global params. (water input)
 Tin   = 273.0+30.0 # K
-Pin   = 101.3e3  # Pa
-Win   = 10.0     # kg/s
-Rhoin = 1000.0   # kg/m3
+Pin   = 101.3e3    # Pa
+Win   = 3.5        # kg/s = 210L/min
+Rhoin = 1000.0     # kg/m3
 
 # W-tube pipe params. 
 # inner 100mm(Downward), outer circular150mm(Upward), thickness both 5mm 
@@ -37,8 +37,8 @@ tkPipe   = 20.0
 cpPipe   = 7800.0
 
 # hydraulic diameter of W-tube cross sections 
-dD   = 2 * Ri1
-dU   = 2 *(Ri2 - Ro1)
+dD   = 2.0 * Ri1
+dU   = 2.0 *(Ri2 - Ro1)
 
 # Misc params.
 cg   = 9.81 # m/s2
@@ -100,7 +100,7 @@ dlnf     = np.zeros((nCell,6)   ,dtype=float)
 
 # Physical parameters
 t    = np.full(nCell,300,dtype=float)
-tnew = np.full(nCell,300,dtype=float)
+tnew = t
 
 # grounda water velocity, m/s
 u = np.full(nCell,0.0,dtype=float)
@@ -108,7 +108,7 @@ v = np.full(nCell,0.0,dtype=float)
 w = np.full(nCell,0.0,dtype=float)
 
 tk  = np.full(nCell,1.50  ,dtype=float)
-cp  = np.full(nCell,100.0 ,dtype=float) ###################################### 10000.0
+cp  = np.full(nCell,1000.0 ,dtype=float) 
 rho = np.full(nCell,1600.0,dtype=float)
 nut = tk/(rho*cp)  # = 1.5/(1000*1600)
 
@@ -118,7 +118,7 @@ fluxExt  = np.zeros((nCell,6),dtype=float)
 proveXYZ = [0,0,0]
 probeTemp = 300.0
 
-timeMax = 3600.0*24*365*5  # 3 years simulation
+timeMax = 3600.0*24*365*20  # 10 years simulation
 dtime = 6*3600.0
 Tref = 50.0 # deg.C
 
@@ -536,7 +536,7 @@ def makeMesh():
 
 #------------------------------------------------------------------------------
 
-def exportMesh():   # export VTU (unstructured VTK) mesh via EVTK 
+def exportMesh():   # export VTU (unstructured VTK) mesh via PyEVTK 
   # Define vertices
   x = np.zeros(nNode)
   y = np.zeros(nNode)
@@ -578,15 +578,15 @@ def exportMesh():   # export VTU (unstructured VTK) mesh via EVTK
   field_data = {"test_fd": np.array([1.0, 2.0])}
 
   unstructuredGridToVTK(
-  			"unstructured_mesh",
-  			x, y, z, 
-            connectivity = conn,
-            offsets = offset, 
-            cell_types = ctype,
-            cellData = {"temp": t[:], "bftypeMax": bftypeMax[:]},   
-            pointData = None, 
-            #fieldData = field_data,
-            )
+                       "unstructured_mesh",
+                       x, y, z, 
+                       connectivity = conn,
+                       offsets = offset, 
+                       cell_types = ctype,
+                       cellData = {"temp": t[:], "bftypeMax": bftypeMax[:]},   
+                       pointData = None, 
+                       #fieldData = field_data,
+                       )
 
 #------------------------------------------------------------------------------
 
@@ -752,6 +752,12 @@ def main():
     for i in range(nCell):
       totalVol = totalVol + vol[i]
 
+    # init ground temp
+    for i in range(nCell):
+       if xyzC[i,2] <= Z2:
+           t[i] = Tg1(xyzC[i,2])
+       else:
+           t[i] = Tg2(xyzC[i,2])
 
     time = 0.0
     itime = 0
@@ -772,7 +778,7 @@ def main():
       print("time=",time, tnew.max(), tnew.min(), meanT, TotalWatt, Ttube[2*NZ-1]) 
       writer.writerow([time,meanT,TotalWatt,Ttube[2*NZ-1]])
     
-      if itime % 100 == 0 : 
+      if itime % 10000 == 0 : 
          exportMesh()
     
       if probeTemp < Tref:
