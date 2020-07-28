@@ -122,11 +122,13 @@ timeMax = 3600.0*24*365*20  # 10 years simulation
 dtime = 6*3600.0
 Tref = 50.0 # deg.C
 
-# tube side parameters
-AD = math.pi * Ri1**2 # inner tube
-AU = math.pi * (Ri2**2-Ro1**2)  # outer tube
-UDmean = Win/Rhoin * AD # Downward mean velocity
+# double-tube side parameters
+# - inner tube is upward flow
+# - outer tube is downward flow
+AU = math.pi * Ri1**2 # inner tube / upward
+AD = math.pi * (Ri2**2-Ro1**2)  # outer tube / downward
 UUmean = Win/Rhoin * AU # Upward mean velocity
+UDmean = Win/Rhoin * AD # Downward mean velocity
 
 Ttube  = np.zeros(2*NZ)
 Ttuben = np.zeros(2*NZ)
@@ -170,8 +172,8 @@ for i in range(NZ):
    else: 
      Tg[i] = 273.2 + 120.0 
 
+# initilize in tube 
 Qtube[:] = 1.0
-
 Ttube[:]  = Tin
 Ttuben[:] = Tin
  
@@ -271,14 +273,13 @@ def makeMesh():
   for k in range(NZ):
       Z[k+1] = Z[k] + dZ[k]
 
-#### list to csv
+  # list to csv
   xyz = []
   for k in range(NZ+1): 
     for j in range(NT):
       for i in range(NR+1):
          xyz.append([X[i,j],Y[i,j],Z[k]])
   pd.DataFrame(data=xyz,index=None, columns=["x","y","z"]).to_csv("xyz.csv",index=None,sep=" ")
-####
 
   # Mesh Information  
   #-- index: i,j,k to n
@@ -334,14 +335,12 @@ def makeMesh():
            xyzNode[nv,6] = [X[iv+1,jp] ,Y[iv+1,jp] ,Z[kv+1]]
            xyzNode[nv,7] = [X[iv+1,jm] ,Y[iv+1,jm] ,Z[kv+1]]
 
-#### list to csv 
+  # list to csv 
   xyz = []
   for i in range(nCell):
      for j in range(8):
         xyz.append([xyzNode[i,j,0],xyzNode[i,j,1],xyzNode[i,j,2]])
   pd.DataFrame(data=xyz,index=None, columns=["x","y","z"]).to_csv("xyzNode.csv",index=None,sep=" ")
-####
-
 
   #-- Edge Info.
   for kv in range((NZ+1)-1): 
@@ -662,13 +661,14 @@ def updateTemp(probeTemp):
 
 #------------------------------------------------------------------------------
 
-def updateHeatFlux():    # double tube system
+def updateHeatFlux():    # double tube system (outer is downward/innner is upward)
 
      # Local Reynolds number and Prandtl numbers
      for k in range(0,NZ): 
         Redtube[k] = UDmean * dD / mutube[k]   
      for k in range(NZ,2*NZ): 
         Redtube[k] = UUmean * dU / mutube[k]
+     print(UDmean, UUmean, dD, dU, mutube[1], np.ndarray.max(Redtube))
 
      # update boundary heat transfer coeffcients  
      for k in range(0,NZ): 
@@ -743,21 +743,24 @@ def main():
 
   if os.path.exists("output.csv"): 
     os.remove("output.csv")
+  
   with open("output.csv", mode='a') as f:
     writer=csv.writer(f,delimiter=" ")
         
     makeMesh()
 
-    totalVol = 0.0
-    for i in range(nCell):
-      totalVol = totalVol + vol[i]
-
-    # init ground temp
+    # init ground temperature
     for i in range(nCell):
        if xyzC[i,2] <= Z2:
            t[i] = Tg1(xyzC[i,2])
        else:
            t[i] = Tg2(xyzC[i,2])
+
+    # total ground volume
+    totalVol = 0.0
+    for i in range(nCell):
+      totalVol = totalVol + vol[i]
+
 
     time = 0.0
     itime = 0
@@ -770,19 +773,18 @@ def main():
 
       updateTemp(probeTemp)
 
+      # calc. mean ground temp.
       meanT = 0.0     
       for i in range(nCell):
         meanT = meanT + t[i]*vol[i]
       meanT = meanT/totalVol  
 
-      print("time=",time, tnew.max(), tnew.min(), meanT, TotalWatt, Ttube[2*NZ-1]) 
-      writer.writerow([time,meanT,TotalWatt,Ttube[2*NZ-1]])
+      print("time=",time, tnew.max(), tnew.min(), meanT, TotalWatt, Ttube[2*NZ-1], Ttube[NZ-1]) 
+      writer.writerow([time,meanT, TotalWatt, Ttube[2*NZ-1], Ttube[NZ-1]])
     
       if itime % 10000 == 0 : 
          exportMesh()
-    
-      if probeTemp < Tref:
-         break
 
 if __name__ == "__main__":
     main()
+    
