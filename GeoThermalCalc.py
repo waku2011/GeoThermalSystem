@@ -118,8 +118,8 @@ fluxExt  = np.zeros((nCell,6),dtype=float)
 proveXYZ = [0,0,0]
 probeTemp = 300.0
 
-timeMax = 3600.0*24*365*20  # 10 years simulation
-dtime = 6*3600.0
+timeMax = 3600.0*24*30*3  # 3month simulation
+dtime = 50.0
 Tref = 50.0 # deg.C
 
 # double-tube side parameters
@@ -127,8 +127,8 @@ Tref = 50.0 # deg.C
 # - outer tube is downward flow
 AU = math.pi * Ri1**2 # inner tube / upward
 AD = math.pi * (Ri2**2-Ro1**2)  # outer tube / downward
-UUmean = Win/Rhoin * AU # Upward mean velocity
-UDmean = Win/Rhoin * AD # Downward mean velocity
+UUmean = (Win/Rhoin) / AU # Upward mean velocity
+UDmean = (Win/Rhoin) / AD # Downward mean velocity
 
 Ttube  = np.zeros(2*NZ)
 Ttuben = np.zeros(2*NZ)
@@ -535,7 +535,7 @@ def makeMesh():
 
 #------------------------------------------------------------------------------
 
-def exportMesh():   # export VTU (unstructured VTK) mesh via PyEVTK 
+def exportData():   # export VTU (unstructured VTK) mesh via PyEVTK 
   # Define vertices
   x = np.zeros(nNode)
   y = np.zeros(nNode)
@@ -586,6 +586,17 @@ def exportMesh():   # export VTU (unstructured VTK) mesh via PyEVTK
                        pointData = None, 
                        #fieldData = field_data,
                        )
+
+def exportDepthTemp(filename):
+
+  if os.path.exists(filename): 
+    os.remove(filename)
+  with open(filename, mode='a') as f:
+    writer=csv.writer(f,delimiter=" ")
+   
+    for k in range(NZ):
+      writer.writerow([-Ztube[k], Ttube[2*NZ-1-k], Ttube[k]])       
+ 
 
 #------------------------------------------------------------------------------
 
@@ -668,49 +679,74 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
         Redtube[k] = UDmean * dD / mutube[k]   
      for k in range(NZ,2*NZ): 
         Redtube[k] = UUmean * dU / mutube[k]
-     print(UDmean, UUmean, dD, dU, mutube[1], np.ndarray.max(Redtube))
+     #print(UDmean, UUmean, dD, dU, mutube[1], np.ndarray.max(Redtube))
 
      # update boundary heat transfer coeffcients  
      for k in range(0,NZ): 
-        htctube[k,0] = htc_DB(Redtube[k], Prtube[k], tktube[k], dD)
-        htctube[k,1] = htc_DB(Redtube[2*NZ-1-k], Prtube[2*NZ-1-k], tktube[2*NZ-1-k], dU)
-        htctube[k,2] = htc_DB(Redtube[2*NZ-1-k], Prtube[2*NZ-1-k], tktube[2*NZ-1-k], dU)
+        htctube[k,0] = htc_DB(Redtube[2*NZ-1-k], Prtube[2*NZ-1-k], tktube[2*NZ-1-k], dU)
+        htctube[k,1] = htc_DB(Redtube[k]       , Prtube[k]       , tktube[k]       , dD)
+        htctube[k,2] = htc_DB(Redtube[k]       , Prtube[k]       , tktube[k]       , dD)
         htctube[k,3] = htc_OUT(Z[k])
 
      # update input heat flux, W
-     ## inner tube heat budget, W
+     ## outer tube heat budget downward, W
      for k in range(0,NZ):
-        Regist = 1./(htctube[k,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe + 1./(htctube[k,1]*Ro1)
-        hf_r   = 2 * math.pi * DZtube[k] / Regist * (Ttube[k] - Ttube[2*NZ-1-k])
-       
+     
+        # CV in-flux
         if k == 0:
           hf_in  = UDmean * (Dtube[k]*cptube[k]*Tin) * AD 
         else:
           hf_in  = UDmean * (Dtube[k-1]*cptube[k-1]*Ttube[k-1]) * AD 
+     
+        # CV radial in-flux 
+        Regist = 1./(htctube[k,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe + 1./(htctube[k,1]*Ro1)
+        hf_ri  = 2 * math.pi * DZtube[k] / Regist * (Ttube[2*NZ-1-k] - Ttube[k])
+       
+        # CV radial out-flux
+        hf_ro   = 0.0 
+        Registo = 1./(htctube[k,2]*Ri2)+math.log(Ro2/Ri2)/tkPipe + 1./(htctube[k,3]*Ro2)
+        
+        sumArea = 0.0
+        for j in range(NT):
+          iadj = kj2iadj[k,j,0]
+          jadj = kj2iadj[k,j,1]
+          sumArea = sumArea + faceArea[iadj,jadj]
+        for j in range(NT):
+          iadj = kj2iadj[k,j,0]
+          jadj = kj2iadj[k,j,1]
+          areaWeight = faceArea[iadj,jadj]/sumArea
+          
+          fluxExt[iadj,jadj] = 2 * math.pi * DZtube[k] / Registo * (Ttube[k] - t[iadj]) * areaWeight # W
+          hf_ro = hf_ro + fluxExt[iadj,jadj]
+       
+        # CV out-flux       
         hf_out =  UDmean * (Dtube[k]*cptube[k]*Ttube[k]) * AD   
-        netHeattube[k] = hf_in - hf_out - hf_r 
-     ## outer tube heat budget  
+        
+        # net flux
+        netHeattube[k] =  hf_in - hf_out + hf_ri - hf_ro 
+         
+     ##  inner tube heat budget upward, W  
      for k in range(NZ,2*NZ):
      
         kk = 2*NZ-1-k
 
-        Registi = 1./(htctube[kk,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe + 1./(htctube[kk,1]*Ro1)
-        Registo = 1./(htctube[kk,2]*Ri2)+math.log(Ro2/Ri2)/tkPipe + 1./(htctube[kk,3]*Ro2)
-        hf_ri   = 2 * math.pi * DZtube[k] / Registi * (Ttube[k] - Ttube[2*NZ-1-k])
- 
-        hf_ro   = 0.0 
-        for j in range(NT):
-          iadj = kj2iadj[kk,j,0]
-          jadj = kj2iadj[kk,j,1]
-          areaWeight = faceArea[iadj,jadj]/(2*math.pi*Ro2 * DZtube[k])
-          fluxExt[iadj,jadj] = 2 * math.pi * DZtube[k] / Registo * (Ttube[k] - t[iadj]) * areaWeight
-          hf_ro = hf_ro + fluxExt[iadj,jadj]
+        # CV in-flux
+        if kk == NZ-1:
+          hf_in  =  UUmean * (Dtube[kk]*cptube[kk]*Ttube[kk]) * AU 
+        else:
+          hf_in  =  UUmean * (Dtube[k-1]*cptube[k-1]*Ttube[k-1]) * AU
         
-        hf_in  =  UUmean * (Dtube[k-1]*cptube[k-1]*Ttube[k-1]) * AU
-        hf_out =  UUmean * (Dtube[k]*cptube[k]*Ttube[k]) * AU   
-        netHeattube[k] = hf_in - hf_out + hf_ri - hf_ro 
-
-     # update temperature (Euler) and pressure
+        # CV radial out-flux  
+        Registi = 1./(htctube[kk,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe + 1./(htctube[kk,1]*Ro1)
+        hf_ro   = 2 * math.pi * DZtube[k] / Registi * (Ttube[k] - Ttube[2*NZ-1-k])
+               
+        # CV out-flux
+        hf_out =  UUmean * (Dtube[k]*cptube[k]*Ttube[k]) * AU  
+        
+        # net flux
+        netHeattube[k] = hf_in - hf_ro - hf_out 
+      
+     # update WF state (temperature (Euler) and pressure, etc.)
      for k in range(2*NZ):
         Ttuben[k] = Ttube[k] + netHeattube[k]/(Dtube[k]*cptube[k]*Vtube[k]) * dtime 
 
@@ -726,13 +762,13 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
 
      # calc. thermal budget
      TotalWatt = 0.0 
-     for k in range(NZ,2*NZ):
-        kk = 2*NZ-1-k 
+     for k in range(NZ):
         for j in range(NT):
-          iadj = kj2iadj[kk,j,0]
-          jadj = kj2iadj[kk,j,1]  
+          iadj = kj2iadj[k,j,0]
+          jadj = kj2iadj[k,j,1]  
           # minus means outward flux (e.g.,inward ground) "fluxExt" is positive.
-          TotalWatt = TotalWatt - fluxExt[iadj,jadj] * faceArea[iadj,jadj]
+          # note that fluxExt is in [W] 
+          TotalWatt = TotalWatt - fluxExt[iadj,jadj] 
 
      return TotalWatt
 
@@ -780,10 +816,11 @@ def main():
       meanT = meanT/totalVol  
 
       print("time=",time, tnew.max(), tnew.min(), meanT, TotalWatt, Ttube[2*NZ-1], Ttube[NZ-1]) 
-      writer.writerow([time,meanT, TotalWatt, Ttube[2*NZ-1], Ttube[NZ-1]])
+      writer.writerow([time, meanT, TotalWatt, Ttube[2*NZ-1], Ttube[NZ-1]])
     
-      if itime % 10000 == 0 : 
-         exportMesh()
+      if itime % 2000 == 0 :   # dtime = 50s, thus 2000steps = 100000s = 27.8hrs
+         exportData()
+         exportDepthTemp("depthTemp.csv")
 
 if __name__ == "__main__":
     main()
