@@ -22,7 +22,7 @@ import os
 # Global params. (water input)
 Tin   = 273.0+30.0 # K
 Pin   = 101.3e3    # Pa
-Win   = 3.5        # kg/s = 210L/min
+Win   = 200E-3/60.0        # kg/s = 200L/min
 Rhoin = 1000.0     # kg/m3
 
 # W-tube pipe params. 
@@ -119,7 +119,7 @@ proveXYZ = [0,0,0]
 probeTemp = 300.0
 
 timeMax = 3600.0*24*30*3  # 3month simulation
-dtime = 50.0
+dtime = 50.0 
 Tref = 50.0 # deg.C
 
 # double-tube side parameters
@@ -815,8 +815,8 @@ def main():
         meanT = meanT + t[i]*vol[i]
       meanT = meanT/totalVol  
 
-      print("time=",time, tnew.max(), tnew.min(), meanT, TotalWatt, Ttube[2*NZ-1], Ttube[NZ-1]) 
-      writer.writerow([time, meanT, TotalWatt, Ttube[2*NZ-1], Ttube[NZ-1]])
+      print("time=",time, tnew.max(), tnew.min(), meanT, TotalWatt, Ttube[0], Ttube[NZ-1], Ttube[2*NZ-1]) 
+      writer.writerow([time, meanT, TotalWatt, Ttube[0], Ttube[NZ-1], Ttube[2*NZ-1]])
     
       if itime % 2000 == 0 :   # dtime = 50s, thus 2000steps = 100000s = 27.8hrs
          exportData()
