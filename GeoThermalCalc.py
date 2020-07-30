@@ -22,19 +22,19 @@ import os
 # Global params. (water input)
 Tin   = 273.0+30.0 # K
 Pin   = 101.3e3    # Pa
-Win   = 200E-3/60.0        # kg/s = 200L/min
+Win   = 200.0/60.0 # default: 3.333kg/s = 200L/min = 200kg/min
 Rhoin = 1000.0     # kg/m3
 
-# W-tube pipe params. 
+# W-tube pipe params. (SUS316)
 # inner 100mm(Downward), outer circular150mm(Upward), thickness both 5mm 
 Ri1 = 45.0e-3
 Ro1 = 50.0e-3
 Ri2 = 70.0e-3
 Ro2 = 75.0e-3
 
-rhokPipe = 7800.0
-tkPipe   = 20.0 
-cpPipe   = 7800.0
+rhokPipe = 7980.0
+tkPipe   = 16.7 
+cpPipe   = 590.0
 
 # hydraulic diameter of W-tube cross sections 
 dD   = 2.0 * Ri1
@@ -45,7 +45,7 @@ cg   = 9.81 # m/s2
 
 # thickness of geo-layers, m
 Lg1 = 350.0 
-Lg2 =1150.0
+Lg2 = 150.0
 
 # depth from surface
 Z1  = 0.0      
@@ -57,10 +57,10 @@ RoBC = 50.0 # soil outer boundary radius, m
  
 # number of cells for each direction
 NR =  8   #16 # radius
-NT = 16   #32 # tangential 
-NZ = 30   # depth
-NZ1 = 7
-NZ2 =23   # NZ1+NZ2=NZ
+NT =  8   #32 # tangential 
+NZ = 20   # depth
+NZ1 =14
+NZ2 = 6   # NZ1+NZ2=NZ
 
 nNode = (NR+1)*NT*(NZ+1)  # num. of node
 nCell = NR*NT*NZ  # num. of cell
@@ -107,10 +107,10 @@ u = np.full(nCell,0.0,dtype=float)
 v = np.full(nCell,0.0,dtype=float)
 w = np.full(nCell,0.0,dtype=float)
 
-tk  = np.full(nCell,1.50  ,dtype=float)
-cp  = np.full(nCell,1000.0 ,dtype=float) 
-rho = np.full(nCell,1600.0,dtype=float)
-nut = tk/(rho*cp)  # = 1.5/(1000*1600)
+tk  = np.full(nCell,2.3   ,dtype=float)
+cp  = np.full(nCell,810.0 ,dtype=float) 
+rho = np.full(nCell,2650.0,dtype=float)
+nut = tk/(rho*cp)  # = 1.071e-6 m2/s
 
 # Boudnary flux, W/m2
 fluxExt  = np.zeros((nCell,6),dtype=float)
@@ -118,8 +118,8 @@ fluxExt  = np.zeros((nCell,6),dtype=float)
 proveXYZ = [0,0,0]
 probeTemp = 300.0
 
-timeMax = 3600.0*24*30*3  # 3 month simulation
-dtime = 50.0
+timeMax = 3600.0*24*2  # 2days simulation
+dtime = 10.0
 Tref = 50.0 # deg.C
 
 # double-tube side parameters
@@ -462,7 +462,7 @@ def makeMesh():
     for i in range(nCell): 
       nCellAdj[i,j] = i  # initialize
   
-  calc_nCellAdj = True
+  calc_nCellAdj = False
   
   #////
   if calc_nCellAdj:
@@ -609,7 +609,7 @@ def exportDepthTemp(filename):
     writer=csv.writer(f,delimiter=" ")
    
     for k in range(NZ):
-      writer.writerow([-Ztube[k], Ttube[2*NZ-1-k], Ttube[k]])       
+      writer.writerow([-Ztube[k], Ttube[k], Ttube[2*NZ-1-k]])       
  
 
 #------------------------------------------------------------------------------
@@ -659,7 +659,7 @@ def updateTemp(probeTemp):
     for i in range(nCell):
        if 1<= bftype[i,j] <= 4:       # boundary surfaces
          tkf = 0.5*(tk[i]+tk[nCellAdj[i,j]])  
-         fluxf[i,j] = - rho[i]*cp[i]*uufn[i,j]*tf[i,j] + tkf*(tf[i,j]-t[i])/dlnf[i,j] + fluxExt[i,j]
+         fluxf[i,j] = - rho[i]*cp[i]*uufn[i,j]*tf[i,j] + tkf*(tf[i,j]-t[i])/dlnf[i,j] + fluxExt[i,j]/faceArea[i,j]
        else:                          # temperature (simple upwind interpolation)
          tkf = 0.5*(tk[i]+tk[nCellAdj[i,j]])  
          fluxf[i,j] = - rho[i]*cp[i]*uufn[i,j]*tf[i,j] + tkf*(t[nCellAdj[i,j]]-t[i])/dln[i,j] 
@@ -829,10 +829,13 @@ def main():
         meanT = meanT + t[i]*vol[i]
       meanT = meanT/totalVol  
 
-      print("time=",time, tnew.max(), tnew.min(), meanT, TotalWatt, Ttube[0], Ttube[NZ-1], Ttube[2*NZ-1]) 
-      writer.writerow([time, meanT, TotalWatt, Ttube[0], Ttube[NZ-1], Ttube[2*NZ-1]])
+      heatBudget = Win*4245.0*(Ttube[2*NZ-1]-Ttube[0])
+      deltaTemp  = Ttube[2*NZ-1]-Ttube[0]
+
+      print(   "time=",time/(3600*24), TotalWatt,heatBudget,Ttube[0]-273.2,Ttube[NZ-1]-273.2,Ttube[2*NZ-1]-273.2,deltaTemp) 
+      writer.writerow([time/(3600*24), TotalWatt,heatBudget,Ttube[0]-273.2,Ttube[NZ-1]-273.2,Ttube[2*NZ-1]-273.2,deltaTemp])
     
-      if itime % 2000 == 0 :   # dtime = 50s, thus 2000steps = 100000s = 27.8hrs
+      if itime % 144 == 0 : 
          exportData()
          exportDepthTemp("depthTemp.csv")
 
