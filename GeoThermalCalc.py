@@ -56,8 +56,8 @@ RiBC = 0.1  # soil inner boundary radius, m
 RoBC = 50.0 # soil outer boundary radius, m
  
 # number of cells for each direction
-NR =  4   #16 # radius
-NT =  8   #32 # tangential 
+NR =  8   #16 # radius
+NT = 16   #32 # tangential 
 NZ = 30   # depth
 NZ1 = 7
 NZ2 =23   # NZ1+NZ2=NZ
@@ -118,8 +118,8 @@ fluxExt  = np.zeros((nCell,6),dtype=float)
 proveXYZ = [0,0,0]
 probeTemp = 300.0
 
-timeMax = 3600.0*24*30*3  # 3month simulation
-dtime = 50.0 
+timeMax = 3600.0*24*30*3  # 3 month simulation
+dtime = 50.0
 Tref = 50.0 # deg.C
 
 # double-tube side parameters
@@ -252,7 +252,10 @@ def rectArea(A,B,C,D):
 
 #------------------------------------------------------------------------------
 
-def makeMesh():
+def makeMesh():  
+  
+  global nCellAdj 
+    
   dRadius = (RoBC-RiBC)/NR  
   for i in range(NR+1):	  
     R[i] = RiBC + dRadius * i  
@@ -451,24 +454,35 @@ def makeMesh():
      xyz.append([xyzC[i,0],xyzC[i,1],xyzC[i,2]])
   pd.DataFrame(data=xyz,index=None, columns=["x","y","z"]).to_csv("xyzC.csv",index=None,sep=" ")
 
-  #-- Adj cell Info. 
 
-  for j in range(6):
-     for i in range(nCell): 
-        nCellAdj[i,j] = i  # initialize
-
-  ### ToDo: file I/O 
   t1 = time.time()
-  
+  #//// 
+  #-- Adj cell Info. 
   for j in range(6):
-     for i in range(nCell): 
-        for l in range(6):
-           for k in range(nCell): 
-              if (k != i) and (np.dot(xyzCf[i,j,:]-xyzCf[k,l,:],xyzCf[i,j,:]-xyzCf[k,l,:]) <= 1.e-16):
-                nCellAdj[i,j] = k
-  '''
-  for i in range(nCell): 
-     for k in range(nCell): 
+    for i in range(nCell): 
+      nCellAdj[i,j] = i  # initialize
+  
+  calc_nCellAdj = True
+  
+  #////
+  if calc_nCellAdj:
+  
+    for j in range(6):
+       for i in range(nCell): 
+          for l in range(6):
+             for k in range(nCell): 
+                if (k != i) and (np.dot(xyzCf[i,j,:]-xyzCf[k,l,:],xyzCf[i,j,:]-xyzCf[k,l,:]) <= 1.e-16):
+                  nCellAdj[i,j] = k
+  
+    pd.DataFrame(data=nCellAdj, index=None).to_csv("nCellAdj.csv",sep=" ",index=None,header=None)    
+  
+  else:
+ 
+    nCellAdj = pd.read_csv("nCellAdj.csv",sep=" ",dtype="int64",header=None).values
+  
+    '''
+    for i in range(nCell): 
+       for k in range(nCell): 
           if (i == k) or (np.dot(xyzC[i,:]-xyzC[k,:],xyzC[i,:]-xyzC[k,:]) >= 0.1):
             continue 
           else:
