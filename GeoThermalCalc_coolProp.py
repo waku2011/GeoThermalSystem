@@ -609,7 +609,7 @@ def exportDepthTemp(filename):
     writer=csv.writer(f,delimiter=" ")
    
     for k in range(NZ):
-      writer.writerow([-Ztube[k], Ttube[k], Ttube[2*NZ-1-k]])       
+      writer.writerow([-Ztube[k], Ttube[k], Ttube[2*NZ-1-k], Ptube[k], Ptube[2*NZ-1-k]])       
  
 
 #------------------------------------------------------------------------------
@@ -763,14 +763,15 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
      # update WF state (temperature (Euler) and pressure, etc.)
      for k in range(2*NZ):
         Ttuben[k] = Ttube[k] + netHeattube[k]/(Dtube[k]*cptube[k]*Vtube[k]) * dtime 
-        Ptube[k]  = 101326.50 #PropsSI('P','T',Ttuben[i],'Q',Qtube[i],'Water')
+        Ptube[k]  = Pin + Dtube[k] * cg * Ztube[k]  # statick pressure 
+        #Ptube[k]  = PropsSI('P','T',Ttuben[k],'Q',Qtube[k],'Water')
         
-        Dtube[k]  = PropsSI('D','T',Ttuben[i],'P',Ptube[i],'Water')
-        htube[k]  = PropsSI('H','T',Ttuben[i],'P',Ptube[i],'Water')
-        mutube[k] = PropsSI('V','T',Ttuben[i],'P',Ptube[i],'Water')/Dtube[i] # m2/s
-        Prtube[k] = PropsSI('PRANDTL','T',Ttuben[i],'P',Ptube[i],'Water')
-        tktube[k] = PropsSI('CONDUCTIVITY','T',Ttuben[i],'P',Ptube[i],'Water')
-        cptube[k] = PropsSI('C','T',Ttuben[i],'P',Ptube[i],'Water')
+        Dtube[k]  = PropsSI('D','T',Ttube[k],'P',Ptube[k],'Water')
+        htube[k]  = PropsSI('H','T',Ttube[k],'P',Ptube[k],'Water')
+        mutube[k] = PropsSI('V','T',Ttube[k],'P',Ptube[k],'Water')/Dtube[k] # m2/s
+        Prtube[k] = PropsSI('PRANDTL','T',Ttube[k],'P',Ptube[k],'Water')
+        tktube[k] = PropsSI('CONDUCTIVITY','T',Ttube[k],'P',Ptube[k],'Water')
+        cptube[k] = PropsSI('C','T',Ttube[k],'P',Ptube[k],'Water')
 
      Ttube[:] = Ttuben[:]
 
