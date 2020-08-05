@@ -34,6 +34,7 @@ Ro2 = 75.0e-3
 
 rhokPipe = 7980.0
 tkPipe   = 16.7 
+tkPipe_inner = 16.7   
 cpPipe   = 590.0
 
 # hydraulic diameter of W-tube cross sections 
@@ -118,7 +119,7 @@ fluxExt  = np.zeros((nCell,6),dtype=float)
 proveXYZ = [0,0,0]
 probeTemp = 300.0
 
-timeMax = 3600.0*24*2  # 2days simulation
+timeMax = 3600.0*24  # 1day simulation
 dtime = 10.0
 Tref = 50.0 # deg.C
 
@@ -168,7 +169,7 @@ for i in range(NZ):
 Tg = np.zeros(NZ)
 for i in range(NZ):
    if Z[i] < Z2:
-     Tg[i] = 273.2 + 30.0+(100.0/350.0)*Z[i]  
+     Tg[i] = 273.2 + 20.0+(100.0/350.0)*Z[i]  
    else: 
      Tg[i] = 273.2 + 120.0 
 
@@ -178,7 +179,7 @@ Ttube[:]  = Tin
 Ttuben[:] = Tin
  
 for i in range(2*NZ):
-   Ptube[i]  = PropsSI('P','T',Ttube[i],'Q',Qtube[i],'Water')
+   Ptube[i]  = Pin + Rhoin * cg * (Ztube[i])   # PropsSI('P','T',Ttube[i],'Q',Qtube[i],'Water')
    Dtube[i]  = PropsSI('D','T',Ttube[i],'P',Ptube[i],'Water')
    htube[i]  = PropsSI('H','T',Ttube[i],'P',Ptube[i],'Water')
    mutube[i] = PropsSI('V','T',Ttube[i],'P',Ptube[i],'Water')/Dtube[i] # m2/s
@@ -713,7 +714,7 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
           hf_in  = UDmean * (Dtube[k-1]*cptube[k-1]*Ttube[k-1]) * AD 
      
         # CV radial in-flux 
-        Regist = 1./(htctube[k,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe + 1./(htctube[k,1]*Ro1)
+        Regist = 1./(htctube[k,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe_inner + 1./(htctube[k,1]*Ro1)
         hf_ri  = 2 * math.pi * DZtube[k] / Regist * (Ttube[2*NZ-1-k] - Ttube[k])
        
         # CV radial out-flux
@@ -751,7 +752,7 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
           hf_in  =  UUmean * (Dtube[k-1]*cptube[k-1]*Ttube[k-1]) * AU
         
         # CV radial out-flux  
-        Registi = 1./(htctube[kk,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe + 1./(htctube[kk,1]*Ro1)
+        Registi = 1./(htctube[kk,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe_inner + 1./(htctube[kk,1]*Ro1)
         hf_ro   = 2 * math.pi * DZtube[k] / Registi * (Ttube[k] - Ttube[2*NZ-1-k])
                
         # CV out-flux
