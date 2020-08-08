@@ -20,9 +20,9 @@ import csv
 import os
 
 # Global params. (water input)
-Tin   = 273.0+30.0 # K
+Tin   = 273.0+70.0 # K (default inlet temp. 70degC)
 Pin   = 101.3e3    # Pa
-Win   = 200.0/60.0 # default: 3.333kg/s = 200L/min = 200kg/min
+Win   = 500.0/60.0 # L/s (default 500L/min = 500kg/min)
 Rhoin = 1000.0     # kg/m3
 
 # W-tube pipe params. (SUS316)
@@ -32,10 +32,10 @@ Ro1 = 50.0e-3
 Ri2 = 70.0e-3
 Ro2 = 75.0e-3
 
-rhokPipe = 7980.0
-tkPipe   = 16.7 
+rhokPipe     = 7980.0
+tkPipe       = 16.7 
 tkPipe_inner = 16.7   
-cpPipe   = 590.0
+cpPipe       = 590.0
 
 # hydraulic diameter of W-tube cross sections 
 dD   = 2.0 * Ri1
@@ -703,7 +703,22 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
         htctube[k,2] = htc_DB(Redtube[k]       , Prtube[k]       , tktube[k]       , dD)
         htctube[k,3] = htc_OUT(Z[k])
 
+
+     # insulation factors
+     tkPipe_inner_insFactor = np.ones(NZ,dtype=float)
+     for k in range(NZ,2*NZ):
+        if Ztube[k] <= 500.0:        
+           kk = 2*NZ-1-k
+           tkPipe_inner_insFactor[kk] = 0.1
+       
+     tkPipe_outer_insFactor = np.ones(NZ,dtype=float)
+     for k in range(0,NZ):
+        if Ztube[k] <= 150.0:        
+           tkPipe_outer_insFactor[k] = 0.1   
+     
+  
      # update input heat flux, W
+     
      ## outer tube heat budget downward, W
      for k in range(0,NZ):
      
@@ -714,12 +729,12 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
           hf_in  = UDmean * (Dtube[k-1]*cptube[k-1]*Ttube[k-1]) * AD 
      
         # CV radial in-flux 
-        Regist = 1./(htctube[k,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe_inner + 1./(htctube[k,1]*Ro1)
+        Regist = 1./(htctube[k,0]*Ri1)+math.log(Ro1/Ri1)/(tkPipe_inner*tkPipe_inner_insFactor[k]) + 1./(htctube[k,1]*Ro1)
         hf_ri  = 2 * math.pi * DZtube[k] / Regist * (Ttube[2*NZ-1-k] - Ttube[k])
        
         # CV radial out-flux
         hf_ro   = 0.0 
-        Registo = 1./(htctube[k,2]*Ri2)+math.log(Ro2/Ri2)/tkPipe + 1./(htctube[k,3]*Ro2)
+        Registo = 1./(htctube[k,2]*Ri2)+math.log(Ro2/Ri2)/(tkPipe*tkPipe_outer_insFactor[k])+ 1./(htctube[k,3]*Ro2)
         
         sumArea = 0.0
         for j in range(NT):
@@ -752,7 +767,7 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
           hf_in  =  UUmean * (Dtube[k-1]*cptube[k-1]*Ttube[k-1]) * AU
         
         # CV radial out-flux  
-        Registi = 1./(htctube[kk,0]*Ri1)+math.log(Ro1/Ri1)/tkPipe_inner + 1./(htctube[kk,1]*Ro1)
+        Registi = 1./(htctube[kk,0]*Ri1)+math.log(Ro1/Ri1)/(tkPipe_inner*tkPipe_inner_insFactor[kk]) + 1./(htctube[kk,1]*Ro1)
         hf_ro   = 2 * math.pi * DZtube[k] / Registi * (Ttube[k] - Ttube[2*NZ-1-k])
                
         # CV out-flux
@@ -764,14 +779,14 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
      # update WF state (temperature (Euler) and pressure, etc.)
      for k in range(2*NZ):
         Ttuben[k] = Ttube[k] + netHeattube[k]/(Dtube[k]*cptube[k]*Vtube[k]) * dtime 
-
-        Ptube[k]  = 101326.50 #PropsSI('P','T',Ttuben[i],'Q',Qtube[i],'Water')
-        Dtube[k]  = 1000.0    #PropsSI('D','T',Ttuben[i],'P',Ptube[i],'Water')
-        htube[k]  = 335.0e3   #PropsSI('H','T',Ttuben[i],'P',Ptube[i],'Water')
-        mutube[k] = 1e-6      #PropsSI('V','T',Ttuben[i],'P',Ptube[i],'Water')/Dtube[i] # m2/s
-        Prtube[k] = 3.0       #PropsSI('PRANDTL','T',Ttuben[i],'P',Ptube[i],'Water')
-        tktube[k] = 0.56      #PropsSI('CONDUCTIVITY','T',Ttuben[i],'P',Ptube[i],'Water')
-        cptube[k] = 4190.0    #PropsSI('C','T',Ttuben[i],'P',Ptube[i],'Water')
+        Ptube[k] = Pin + Dtube[k]*cg*Ztube[k]
+        #Ptube[k]  = PropsSI('P','T',Ttuben[k],'Q',Qtube[k],'Water')
+        Dtube[k]  = PropsSI('D','T',Ttuben[k],'P',Ptube[k],'Water')
+        htube[k]  = PropsSI('H','T',Ttuben[k],'P',Ptube[k],'Water')
+        mutube[k] = PropsSI('V','T',Ttuben[k],'P',Ptube[k],'Water')/Dtube[k] # m2/s
+        Prtube[k] = PropsSI('PRANDTL','T',Ttuben[k],'P',Ptube[k],'Water')
+        tktube[k] = PropsSI('CONDUCTIVITY','T',Ttuben[k],'P',Ptube[k],'Water')
+        cptube[k] = PropsSI('C','T',Ttuben[k],'P',Ptube[k],'Water')
 
      Ttube[:] = Ttuben[:]
 
@@ -831,12 +846,12 @@ def main():
       meanT = meanT/totalVol  
 
       heatBudget = Win*4245.0*(Ttube[2*NZ-1]-Ttube[0])
-      deltaTemp  = Ttube[2*NZ-1]-Ttube[0]
+      deltaTemp  = Ttube[2*NZ-1]-Tin
 
       print(   "time=",time/(3600*24), TotalWatt,heatBudget,Ttube[0]-273.2,Ttube[NZ-1]-273.2,Ttube[2*NZ-1]-273.2,deltaTemp) 
       writer.writerow([time/(3600*24), TotalWatt,heatBudget,Ttube[0]-273.2,Ttube[NZ-1]-273.2,Ttube[2*NZ-1]-273.2,deltaTemp])
     
-      if itime % 144 == 0 : 
+      if itime %  180 == 0 : 
          exportData()
          exportDepthTemp("depthTemp.csv")
 
