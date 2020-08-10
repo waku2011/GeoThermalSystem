@@ -27,8 +27,8 @@ Rhoin = 1000.0     # kg/m3
 
 # W-tube pipe params. (SUS316)
 # inner 100mm(Downward), outer circular150mm(Upward), thickness both 5mm 
-Ri1 = 45.0e-3
-Ro1 = 50.0e-3
+Ri1 = 20.0e-3
+Ro1 = 25.0e-3
 Ri2 = 70.0e-3
 Ro2 = 75.0e-3
 
@@ -120,7 +120,7 @@ proveXYZ = [0,0,0]
 probeTemp = 300.0
 
 timeMax = 3600.0*24  # 1day simulation
-dtime = 10.0
+dtime = 2.0
 Tref = 50.0 # deg.C
 
 # double-tube side parameters
@@ -780,13 +780,13 @@ def updateHeatFlux():    # double tube system (outer is downward/innner is upwar
      for k in range(2*NZ):
         Ttuben[k] = Ttube[k] + netHeattube[k]/(Dtube[k]*cptube[k]*Vtube[k]) * dtime 
         Ptube[k] = Pin + Dtube[k]*cg*Ztube[k]
-        #Ptube[k]  = PropsSI('P','T',Ttuben[k],'Q',Qtube[k],'Water')
-        Dtube[k]  = PropsSI('D','T',Ttuben[k],'P',Ptube[k],'Water')
-        htube[k]  = PropsSI('H','T',Ttuben[k],'P',Ptube[k],'Water')
-        mutube[k] = PropsSI('V','T',Ttuben[k],'P',Ptube[k],'Water')/Dtube[k] # m2/s
-        Prtube[k] = PropsSI('PRANDTL','T',Ttuben[k],'P',Ptube[k],'Water')
-        tktube[k] = PropsSI('CONDUCTIVITY','T',Ttuben[k],'P',Ptube[k],'Water')
-        cptube[k] = PropsSI('C','T',Ttuben[k],'P',Ptube[k],'Water')
+        #Ptube[k]  = PropsSI('P','T',Ttube[k],'Q',Qtube[k],'Water')
+        Dtube[k]  = PropsSI('D','T',Ttube[k],'P',Ptube[k],'Water')
+        htube[k]  = PropsSI('H','T',Ttube[k],'P',Ptube[k],'Water')
+        mutube[k] = PropsSI('V','T',Ttube[k],'P',Ptube[k],'Water')/Dtube[k] # m2/s
+        Prtube[k] = PropsSI('PRANDTL','T',Ttube[k],'P',Ptube[k],'Water')
+        tktube[k] = PropsSI('CONDUCTIVITY','T',Ttube[k],'P',Ptube[k],'Water')
+        cptube[k] = PropsSI('C','T',Ttube[k],'P',Ptube[k],'Water')
 
      Ttube[:] = Ttuben[:]
 
